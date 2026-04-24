@@ -1,3 +1,22 @@
+// Maps geoJSON feature.properties.shapeName (English) to canonical UZ region key.
+// Source: geoBoundaries UZB ADM1 (ODbL, OpenStreetMap).
+export const GEOJSON_NAME_MAP: Record<string, string> = {
+  "Tashkent": "Toshkent shahri",
+  "Tashkent Region": "Toshkent viloyati",
+  "Samarqand Region": "Samarqand viloyati",
+  "Bukhara Region": "Buxoro viloyati",
+  "Andijan Region": "Andijon viloyati",
+  "Fergana Region": "Farg'ona viloyati",
+  "Namangan Region": "Namangan viloyati",
+  "Qashqadaryo Region": "Qashqadaryo viloyati",
+  "Surxondaryo Region": "Surxondaryo viloyati",
+  "Jizzakh Region": "Jizzax viloyati",
+  "Sirdaryo Region": "Sirdaryo viloyati",
+  "Navoiy Region": "Navoiy viloyati",
+  "Xorazm Region": "Xorazm viloyati",
+  "Republic of Karakalpakstan": "Qoraqalpog'iston Respublikasi",
+};
+
 export const UZ_REGIONS: Record<string, { lat: number; lon: number; nameUz: string }> = {
   "Toshkent shahri":               { lat: 41.2995, lon: 69.2401, nameUz: "Toshkent shahri" },
   "Toshkent viloyati":             { lat: 41.0058, lon: 69.5823, nameUz: "Toshkent viloyati" },

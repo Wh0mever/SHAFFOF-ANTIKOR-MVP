@@ -3,6 +3,7 @@ import { fetchTenders, normalize, upsertTenders } from "@/lib/uzex";
 import { prisma } from "@/lib/db";
 import { loadMedians, evaluate, persistAlerts } from "@/lib/rules";
 import { ai } from "@/lib/ai";
+import { notifyCriticalAlert } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,6 +48,9 @@ export async function GET(req: NextRequest) {
               prisma.alert.update({ where: { id: alert.id }, data: { aiExplanation: text } })
             )
             .catch((err) => console.warn("fastExplain failed for", alert.id, err));
+          notifyCriticalAlert(alert, tender).catch((err) =>
+            console.warn("telegram notify failed for", alert.id, err)
+          );
         }
       }
     }

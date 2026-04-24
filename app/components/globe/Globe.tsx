@@ -4,6 +4,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import { Suspense, useMemo } from "react";
 import { UzMap } from "./UzMap";
+import { RegionOutlines } from "./RegionOutlines";
 import { AlertParticles, type ParticleAlert } from "./AlertParticles";
 import { PulseRing } from "./PulseRing";
 import { regionPosition } from "./projection";
@@ -40,6 +41,7 @@ export function Globe({ alerts, onRegionClick }: Props) {
         <Stars radius={50} depth={30} count={3500} factor={4} fade speed={0.4} />
 
         <UzMap alertCountByRegion={countByRegion} onRegionClick={onRegionClick} />
+        <RegionOutlines alertCountByRegion={countByRegion} onRegionClick={onRegionClick} />
         <AlertParticles alerts={alerts} />
 
         {criticals.map((a) => {
