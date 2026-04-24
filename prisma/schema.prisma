@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tender {
+  id              String    @id
+  displayNo       String    @unique
+  title           String
+  amount          BigInt
+  currency        String    @default("UZS")
+  buyerName       String
+  buyerTin        String
+  buyerId         String?
+  sellerName      String?
+  sellerTin       String?
+  region          String
+  district        String?
+  category        String?
+  startDate       DateTime
+  endDate         DateTime
+  bidderCount     Int       @default(0)
+  fetchedAt       DateTime  @default(now())
+
+  alerts          Alert[]
+
+  @@index([region])
+  @@index([fetchedAt])
+  @@index([buyerTin])
+}
+
+model Alert {
+  id              String    @id @default(cuid())
+  tender          Tender    @relation(fields: [tenderId], references: [id])
+  tenderId        String
+  ruleCode        String
+  severity        Int
+  message         String
+  aiExplanation   String?
+  aiResearch      String?
+  aiReport        String?
+  region          String
+  createdAt       DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([region])
+  @@index([severity])
+  @@index([ruleCode])
+}
+
+model BuyerStats {
+  tin             String    @id
+  name            String
+  region          String?
+  totalContracts  Int       @default(0)
+  totalAmount     BigInt    @default(0)
+  suspiciousCount Int       @default(0)
+  riskScore       Float     @default(0)
+  lastUpdated     DateTime  @default(now())
+}
+
+model CategoryMedian {
+  category        String    @id
+  medianAmount    BigInt
+  sampleSize      Int
+  updatedAt       DateTime  @default(now())
+}
