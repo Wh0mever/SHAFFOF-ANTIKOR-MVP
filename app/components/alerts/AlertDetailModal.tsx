@@ -1,29 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { X, User2, Bot, Sparkles, FileText, Download } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, X, User2, Bot, Sparkles, FileText, Download } from "lucide-react";
 import type { ClientAlert } from "@/lib/hooks";
-import { formatUzs } from "@/lib/utils";
 import { Typewriter } from "../ui/Typewriter";
-
-const RULE_LABEL: Record<string, string> = {
-  SOLO: "Единственный участник",
-  PRICE_SPIKE: "Скачок цены",
-  SERIAL: "Серийный победитель",
-  RUSHED: "Срочная закупка",
-  ROUND: "Круглая сумма",
-  REGION: "Региональная концентрация",
-};
+import { RULE_LABEL, RULE_DEFAULT_DESC, severityTint, tenScale } from "@/lib/anomalies";
 
 type AITab = "fast" | "research" | "report";
 
 export function AlertDetailModal({
   alert,
+  allAlerts = [],
   onClose,
 }: {
   alert: ClientAlert | null;
+  allAlerts?: ClientAlert[];
   onClose: () => void;
 }) {
+  // All alerts for the same tender (so we can show the full anomaly list).
+  const anomalies = useMemo(() => {
+    if (!alert) return [];
+    const sameTender = allAlerts.filter((a) => a.tender.id === alert.tender.id);
+    if (sameTender.length === 0) return [alert];
+    // Dedup by ruleCode keeping highest severity per rule.
+    const byRule = new Map<string, ClientAlert>();
+    for (const a of sameTender) {
+      const cur = byRule.get(a.ruleCode);
+      if (!cur || a.severity > cur.severity) byRule.set(a.ruleCode, a);
+    }
+    return Array.from(byRule.values()).sort((a, b) => b.severity - a.severity);
+  }, [alert, allAlerts]);
+
   const [tab, setTab] = useState<AITab>("fast");
   const [explanation, setExplanation] = useState<string | null>(null);
   const [research, setResearch] = useState<string | null>(null);
@@ -98,12 +105,14 @@ export function AlertDetailModal({
   const aiText =
     tab === "fast" ? explanation : tab === "research" ? research : report;
   const isLoading = loading === tab;
-  const tier = alert.severity >= 80 ? "КРИТИЧЕСКИЙ" : alert.severity >= 60 ? "ВЫСОКИЙ РИСК" : "СРЕДНИЙ";
-  const tierColor = alert.severity >= 80 ? "text-rose-400 bg-rose-500/10 ring-rose-500/30" :
-    alert.severity >= 60 ? "text-orange-400 bg-orange-500/10 ring-orange-500/30" :
+  // Use max severity across the tender's anomalies for header / gauge.
+  const maxSeverity = Math.max(alert.severity, ...anomalies.map((a) => a.severity));
+  const tier = maxSeverity >= 80 ? "КРИТИЧЕСКИЙ" : maxSeverity >= 60 ? "ВЫСОКИЙ РИСК" : "СРЕДНИЙ";
+  const tierColor = maxSeverity >= 80 ? "text-rose-400 bg-rose-500/10 ring-rose-500/30" :
+    maxSeverity >= 60 ? "text-orange-400 bg-orange-500/10 ring-orange-500/30" :
     "text-amber-400 bg-amber-500/10 ring-amber-500/30";
 
-  const dasharray = (alert.severity / 100) * 251.32;
+  const dasharray = (maxSeverity / 100) * 251.32;
 
   return (
     <div
@@ -141,7 +150,7 @@ export function AlertDetailModal({
                   cx="45"
                   cy="45"
                   r="40"
-                  stroke={alert.severity >= 80 ? "#f43f5e" : alert.severity >= 60 ? "#f97316" : "#facc15"}
+                  stroke={maxSeverity >= 80 ? "#f43f5e" : maxSeverity >= 60 ? "#f97316" : "#facc15"}
                   strokeWidth="6"
                   fill="none"
                   strokeLinecap="round"
@@ -149,16 +158,22 @@ export function AlertDetailModal({
                 />
               </svg>
               <div className="absolute text-center">
-                <div className="text-2xl font-bold text-zinc-100">{alert.severity}</div>
+                <div className="text-2xl font-bold text-zinc-100">{maxSeverity}</div>
                 <div className="text-[9px] text-zinc-500">/ 100</div>
               </div>
             </div>
             <div className="flex-1">
               <div className="text-sm font-semibold text-zinc-300">Corruption Risk Score</div>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="rounded-md bg-zinc-900 px-2 py-1 text-[11px] text-zinc-300 ring-1 ring-zinc-800">
-                  {alert.message}
-                </span>
+                {anomalies.map((a) => (
+                  <span
+                    key={a.id}
+                    className="rounded-md bg-zinc-900 px-2 py-1 text-[11px] text-zinc-300 ring-1 ring-zinc-800"
+                    title={a.message}
+                  >
+                    {RULE_LABEL[a.ruleCode] ?? a.ruleCode}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -185,6 +200,44 @@ export function AlertDetailModal({
               )}
             </div>
           )}
+
+          <div className="mt-6">
+            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <AlertTriangle className="h-4 w-4 text-orange-400" />
+              Выявленные аномалии ({anomalies.length})
+            </h4>
+            <div className="space-y-2">
+              {anomalies.map((a) => {
+                const tint = severityTint(a.severity);
+                const score10 = tenScale(a.severity);
+                return (
+                  <div
+                    key={a.id}
+                    className="flex items-start gap-3 rounded-lg border border-zinc-800/60 bg-zinc-900/40 p-3"
+                  >
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tint.bg}`}
+                    >
+                      <span className={`text-xs font-bold ${tint.text}`}>{score10}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-white">
+                        {RULE_LABEL[a.ruleCode] ?? a.ruleCode}
+                      </div>
+                      <div className="mt-0.5 text-xs text-zinc-400">
+                        {a.message || RULE_DEFAULT_DESC[a.ruleCode] || ""}
+                      </div>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-md px-2 py-0.5 font-mono text-[10px] font-bold ring-1 ${tint.text} ${tint.bg} ${tint.ring}`}
+                    >
+                      {a.severity}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="mt-6 rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-4">
             <div className="mb-3 flex items-center justify-between">

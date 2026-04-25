@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Bell, EyeOff, AlertOctagon, Zap, CheckCheck } from "lucide-react";
 import { Shell } from "../components/shell/Shell";
+import { LiveEmptyHint } from "../components/shell/EmptyState";
 import { KpiCard } from "../components/dashboard/KpiCard";
 import { AlertItem } from "../components/alerts/AlertItem";
 import { AlertDetailModal } from "../components/alerts/AlertDetailModal";
@@ -42,7 +43,8 @@ export default function AlertsPage() {
 
   return (
     <Shell title="Алерты" subtitle={`${unread} непрочитанных из ${total}`}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <LiveEmptyHint count={alerts.length} />
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Всего" value={total} icon={Bell} tint="indigo" />
         <KpiCard label="Непрочитанные" value={unread} icon={EyeOff} tint="amber" />
         <KpiCard label="Критические" value={critical} icon={AlertOctagon} tint="rose" />
@@ -83,7 +85,7 @@ export default function AlertsPage() {
         )}
       </div>
 
-      <AlertDetailModal alert={openAlert} onClose={() => setOpenAlert(null)} />
+      <AlertDetailModal alert={openAlert} allAlerts={alerts} onClose={() => setOpenAlert(null)} />
     </Shell>
   );
 }

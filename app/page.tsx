@@ -2,6 +2,7 @@
 
 import { ShieldCheck, AlertOctagon, Bell, Bot } from "lucide-react";
 import { Shell } from "./components/shell/Shell";
+import { LiveEmptyHint } from "./components/shell/EmptyState";
 import { KpiCard } from "./components/dashboard/KpiCard";
 import { TrendChart } from "./components/dashboard/TrendChart";
 import { RiskDonut } from "./components/dashboard/RiskDonut";
@@ -25,7 +26,8 @@ export default function DashboardPage() {
 
   return (
     <Shell title="Дашборд" subtitle="Реальное время мониторинга госзакупок Узбекистана">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <LiveEmptyHint count={alerts.length} />
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Всего тендеров"
           value={totalTenders}
