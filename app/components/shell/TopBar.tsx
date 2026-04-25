@@ -8,8 +8,10 @@ type Mode = "LIVE" | "DEMO";
 const KEY = "shaffof.mode";
 
 export function getMode(): Mode {
-  if (typeof window === "undefined") return "LIVE";
-  return (localStorage.getItem(KEY) as Mode) || "LIVE";
+  // First-time visitors → DEMO. Stored choice always wins.
+  if (typeof window === "undefined") return "DEMO";
+  const stored = localStorage.getItem(KEY) as Mode | null;
+  return stored === "LIVE" || stored === "DEMO" ? stored : "DEMO";
 }
 
 export function setMode(m: Mode) {

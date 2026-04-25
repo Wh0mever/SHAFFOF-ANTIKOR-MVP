@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { DEMO_ALERTS, DEMO_STATS } from "./demo";
 
 function getMode(): "LIVE" | "DEMO" {
-  if (typeof window === "undefined") return "LIVE";
-  return (localStorage.getItem("shaffof.mode") as "LIVE" | "DEMO") || "LIVE";
+  // First-time visitors land in DEMO so the app feels alive immediately.
+  // Once the user toggles mode, their choice persists in localStorage.
+  if (typeof window === "undefined") return "DEMO";
+  const stored = localStorage.getItem("shaffof.mode") as "LIVE" | "DEMO" | null;
+  return stored === "LIVE" || stored === "DEMO" ? stored : "DEMO";
 }
 
 function useModeListener() {
