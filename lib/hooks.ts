@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { DEMO_ALERTS, DEMO_STATS } from "./demo";
 
 function getMode(): "LIVE" | "DEMO" {
@@ -9,9 +9,10 @@ function getMode(): "LIVE" | "DEMO" {
 }
 
 function useModeListener() {
-  const [m, setM] = useState<"LIVE" | "DEMO">("LIVE");
+  // Initialize from localStorage SYNCHRONOUSLY so we never start with stale "LIVE".
+  const [m, setM] = useState<"LIVE" | "DEMO">(() => getMode());
   useEffect(() => {
-    setM(getMode());
+    setM(getMode()); // re-sync in case it changed across remounts
     const h = (e: Event) => setM((e as CustomEvent).detail as "LIVE" | "DEMO");
     window.addEventListener("shaffof:mode", h);
     return () => window.removeEventListener("shaffof:mode", h);
@@ -51,31 +52,39 @@ export function useLiveAlerts(intervalMs = 10_000) {
   const [alerts, setAlerts] = useState<ClientAlert[]>([]);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
-  async function pull() {
-    if (mode === "DEMO") {
-      setAlerts(DEMO_ALERTS);
-      setLastSync(new Date());
-      return;
-    }
-    try {
-      const res = await fetch("/api/alerts?limit=200", { cache: "no-store" });
-      if (!res.ok) return;
-      const data = (await res.json()) as { alerts: ClientAlert[] };
-      setAlerts(data.alerts);
-      setLastSync(new Date());
-    } catch (err) {
-      console.warn("poll alerts failed", err);
-    }
-  }
-
   useEffect(() => {
+    let cancelled = false;
+
+    async function pull() {
+      if (mode === "DEMO") {
+        if (!cancelled) {
+          setAlerts(DEMO_ALERTS);
+          setLastSync(new Date());
+        }
+        return;
+      }
+      try {
+        const res = await fetch("/api/alerts?limit=200", { cache: "no-store" });
+        if (cancelled || !res.ok) return;
+        const data = (await res.json()) as { alerts: ClientAlert[] };
+        if (cancelled) return;
+        setAlerts(data.alerts);
+        setLastSync(new Date());
+      } catch (err) {
+        if (!cancelled) console.warn("poll alerts failed", err);
+      }
+    }
+
     pull();
-    if (mode === "DEMO") return;
+    if (mode === "DEMO") return () => { cancelled = true; };
     const t = setInterval(pull, intervalMs);
-    return () => clearInterval(t);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, [intervalMs, mode]);
 
-  return { alerts, lastSync, mode, refresh: pull };
+  return { alerts, lastSync, mode };
 }
 
 export type StatsPayload = {
@@ -91,27 +100,32 @@ export function useStats(intervalMs = 30_000) {
   const mode = useModeListener();
   const [stats, setStats] = useState<StatsPayload | null>(null);
 
-  async function pull() {
-    if (mode === "DEMO") {
-      setStats(DEMO_STATS);
-      return;
-    }
-    try {
-      const res = await fetch("/api/v1/stats", { cache: "no-store" });
-      if (!res.ok) return;
-      const data = (await res.json()) as StatsPayload;
-      setStats(data);
-    } catch (err) {
-      console.warn("poll stats failed", err);
-    }
-  }
-
   useEffect(() => {
+    let cancelled = false;
+
+    async function pull() {
+      if (mode === "DEMO") {
+        if (!cancelled) setStats(DEMO_STATS);
+        return;
+      }
+      try {
+        const res = await fetch("/api/v1/stats", { cache: "no-store" });
+        if (cancelled || !res.ok) return;
+        const data = (await res.json()) as StatsPayload;
+        if (!cancelled) setStats(data);
+      } catch (err) {
+        if (!cancelled) console.warn("poll stats failed", err);
+      }
+    }
+
     pull();
-    if (mode === "DEMO") return;
+    if (mode === "DEMO") return () => { cancelled = true; };
     const t = setInterval(pull, intervalMs);
-    return () => clearInterval(t);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, [intervalMs, mode]);
 
-  return { stats, mode, refresh: pull };
+  return { stats, mode };
 }

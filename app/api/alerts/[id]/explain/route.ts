@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ai } from "@/lib/ai";
+import { localFastExplain } from "@/lib/ai/localFallback";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,15 +18,19 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ explanation: alert.aiExplanation, cached: true });
   }
 
+  let explanation: string;
+  let source: "ai" | "local" = "ai";
   try {
-    const explanation = await ai.explain(alert, alert.tender);
-    await prisma.alert.update({ where: { id: alert.id }, data: { aiExplanation: explanation } });
-    return NextResponse.json({ explanation, cached: false });
+    explanation = await ai.explain(alert, alert.tender);
   } catch (err) {
-    console.error("explain failed", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "explain failed" },
-      { status: 500 }
-    );
+    console.warn("explain AI failed, using local fallback", err);
+    explanation = localFastExplain(alert, alert.tender);
+    source = "local";
   }
+
+  await prisma.alert
+    .update({ where: { id: alert.id }, data: { aiExplanation: explanation } })
+    .catch((e) => console.warn("explain persist failed", e));
+
+  return NextResponse.json({ explanation, cached: false, source });
 }

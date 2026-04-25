@@ -19,7 +19,8 @@ export function setMode(m: Mode) {
 }
 
 export function useMode(): [Mode, (m: Mode) => void] {
-  const [mode, setLocal] = useState<Mode>("LIVE");
+  // Initialize synchronously so the toggle never flickers from LIVE on remount.
+  const [mode, setLocal] = useState<Mode>(() => getMode());
   useEffect(() => {
     setLocal(getMode());
     const h = (e: Event) => setLocal((e as CustomEvent).detail as Mode);

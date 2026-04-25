@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, User2, Bot, Sparkles, FileText, Download } from "lucide-react";
 import type { ClientAlert } from "@/lib/hooks";
 import { formatUzs } from "@/lib/utils";
+import { Typewriter } from "../ui/Typewriter";
 
 const RULE_LABEL: Record<string, string> = {
   SOLO: "Единственный участник",
@@ -203,7 +204,7 @@ export function AlertDetailModal({
               </div>
             </div>
 
-            <div className="min-h-[120px] whitespace-pre-wrap text-sm text-zinc-300">
+            <div className="min-h-[120px] whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">
               {isLoading ? (
                 <div className="flex items-center gap-2 text-zinc-500">
                   <span className="inline-flex gap-1">
@@ -211,10 +212,14 @@ export function AlertDetailModal({
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:200ms]" />
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:400ms]" />
                   </span>
-                  Анализируем…
+                  AI анализирует данные через {tab === "fast" ? "GPT-4o-mini" : tab === "research" ? "Perplexity sonar-pro" : "Claude Sonnet 4.5"}…
                 </div>
               ) : aiText ? (
-                aiText
+                tab === "fast" ? (
+                  <Typewriter text={aiText} speed={10} />
+                ) : (
+                  aiText
+                )
               ) : (
                 <div className="text-zinc-600">
                   Нажмите вкладку выше, чтобы запустить анализ.
