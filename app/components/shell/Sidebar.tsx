@@ -86,13 +86,43 @@ export function Sidebar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
         })}
       </nav>
 
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="absolute bottom-4 left-3 right-3 flex items-center justify-center rounded-lg border border-zinc-800/80 py-2 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300"
-        aria-label="toggle sidebar"
-      >
-        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-      </button>
+      {/* Footer: developer credit + collapse toggle */}
+      <div className="absolute bottom-3 left-3 right-3 space-y-2">
+        {!collapsed && (
+          <a
+            href="https://whomever.uz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2 text-center transition hover:border-emerald-500/30 hover:bg-zinc-900"
+          >
+            <div className="text-[9px] uppercase tracking-wider text-zinc-600">
+              Разработчики
+            </div>
+            <div className="mt-0.5 text-[11px] font-bold tracking-wide text-emerald-400 group-hover:text-emerald-300">
+              OOO WHOMEVER
+            </div>
+            <div className="text-[9px] text-zinc-500">whomever.uz ↗</div>
+          </a>
+        )}
+        {collapsed && (
+          <a
+            href="https://whomever.uz"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="OOO WHOMEVER · whomever.uz"
+            className="block rounded-lg border border-zinc-800/80 bg-zinc-900/40 py-2 text-center text-[10px] font-bold text-emerald-400 hover:border-emerald-500/30"
+          >
+            W
+          </a>
+        )}
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex w-full items-center justify-center rounded-lg border border-zinc-800/80 py-2 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300"
+          aria-label="toggle sidebar"
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+      </div>
     </aside>
   );
 }
