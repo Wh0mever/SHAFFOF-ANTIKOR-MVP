@@ -184,9 +184,9 @@ function NotificationSettings() {
 
 function AIModelsSettings() {
   const models = [
-    { level: "Level 1 — Быстрое объяснение", model: "gpt-4o-mini", provider: "OpenAI", key: "sk-proj-NPheeS•••S-qoA", mode: "Авто", color: "emerald" },
-    { level: "Level 2 — Глубокий анализ", model: "sonar-pro", provider: "Perplexity", key: "pplx-W6kZGY•••j1DuxN", mode: "По запросу", color: "indigo" },
-    { level: "Level 3 — Полный отчёт", model: "claude-sonnet-4-5", provider: "Anthropic Claude", key: "sk-ant-api03•••dbFTwAA", mode: "По запросу", color: "amber" },
+    { level: "Level 1 — Быстрое объяснение", model: "gpt-4o-mini", provider: "OpenAI", key: "sk-proj-••••••••", mode: "Авто", color: "emerald" },
+    { level: "Level 2 — Глубокий анализ", model: "sonar-pro", provider: "Perplexity", key: "pplx-••••••••", mode: "По запросу", color: "indigo" },
+    { level: "Level 3 — Полный отчёт", model: "claude-sonnet-4-5", provider: "Anthropic Claude", key: "sk-ant-api03-••••••••", mode: "По запросу", color: "amber" },
   ];
 
   return (
