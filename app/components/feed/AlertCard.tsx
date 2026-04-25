@@ -130,6 +130,13 @@ export function AlertCard({ alert }: { alert: ClientAlert }) {
           {loading === "report" ? "Yaratilmoqda…" : "Jurnalistik hisobot"}
         </Button>
         <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.open(`/api/alerts/${alert.id}/pdf`, "_blank")}
+        >
+          PDF
+        </Button>
+        <Button
           variant="ghost"
           size="sm"
           onClick={() => navigator.clipboard.writeText(`${location.origin}/feed#${alert.id}`)}

@@ -1,5 +1,6 @@
 import type { Alert, Tender } from "@prisma/client";
 import { formatUzs } from "./utils";
+import { prisma } from "./db";
 
 const TELEGRAM_API = "https://api.telegram.org";
 
@@ -57,10 +58,34 @@ export function formatAlertMessage(alert: Alert, tender: Tender, siteUrl?: strin
 }
 
 export async function notifyCriticalAlert(alert: Alert, tender: Tender) {
-  const chat = channelChatId();
-  if (!chat) return;
-  if (alert.severity < 80) return;
-
   const text = formatAlertMessage(alert, tender, process.env.NEXT_PUBLIC_SITE_URL);
-  await sendTelegram(chat, text).catch((err) => console.warn("notifyCriticalAlert", err));
+
+  const channel = channelChatId();
+  if (channel && alert.severity >= 80) {
+    await sendTelegram(channel, text).catch((err) =>
+      console.warn("notifyCriticalAlert channel", err)
+    );
+  }
+
+  if (!botToken()) return;
+
+  const subs = await prisma.tgSubscription
+    .findMany({ where: { active: true } })
+    .catch(() => []);
+
+  await Promise.all(
+    subs
+      .filter((s) => alert.severity >= s.minSeverity)
+      .filter((s) => s.regions.length === 0 || s.regions.includes(tender.region))
+      .filter(
+        (s) =>
+          s.categories.length === 0 ||
+          (tender.category != null && s.categories.includes(tender.category))
+      )
+      .map((s) =>
+        sendTelegram(s.chatId, text).catch((err) =>
+          console.warn("notifyCriticalAlert sub", s.chatId, err)
+        )
+      )
+  );
 }
