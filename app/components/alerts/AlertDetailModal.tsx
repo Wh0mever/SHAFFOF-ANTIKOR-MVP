@@ -5,6 +5,7 @@ import { AlertTriangle, X, User2, Bot, Sparkles, FileText, Download } from "luci
 import type { ClientAlert } from "@/lib/hooks";
 import { Typewriter } from "../ui/Typewriter";
 import { RULE_LABEL, RULE_DEFAULT_DESC, severityTint, tenScale } from "@/lib/anomalies";
+import { StarButton } from "../shell/StarButton";
 
 type AITab = "fast" | "research" | "report";
 
@@ -134,6 +135,7 @@ export function AlertDetailModal({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <StarButton kind="TENDER" id={alert.tender.id} label={alert.tender.title} size={18} />
             <span className={`rounded-md px-3 py-1.5 text-xs font-bold ring-1 ${tierColor}`}>{tier}</span>
             <button onClick={onClose} className="rounded-md p-2 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300">
               <X className="h-5 w-5" />
@@ -188,18 +190,33 @@ export function AlertDetailModal({
             <Field label="Регион" value={alert.region} />
           </div>
 
-          {alert.tender.sellerName && (
-            <div className="mt-4 rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
-              <div className="mb-1 flex items-center gap-2 text-[11px] text-zinc-500">
-                <User2 className="h-3.5 w-3.5" />
-                Победитель
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
+              <div className="mb-1 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
+                <span className="flex items-center gap-2">
+                  <User2 className="h-3.5 w-3.5" />
+                  Заказчик
+                </span>
+                <StarButton kind="BUYER" id={alert.tender.buyerTin} label={alert.tender.buyerName} size={14} />
               </div>
-              <div className="text-base font-semibold text-zinc-100">{alert.tender.sellerName}</div>
+              <div className="text-sm font-semibold text-zinc-100">{alert.tender.buyerName}</div>
               {alert.tender.buyerTin && (
-                <div className="mt-0.5 text-[11px] text-zinc-500">ИНН: {alert.tender.buyerTin}</div>
+                <div className="mt-0.5 font-mono text-[11px] text-zinc-500">ИНН: {alert.tender.buyerTin}</div>
               )}
             </div>
-          )}
+            {alert.tender.sellerName && (
+              <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
+                <div className="mb-1 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
+                  <span className="flex items-center gap-2">
+                    <User2 className="h-3.5 w-3.5" />
+                    Победитель
+                  </span>
+                  <StarButton kind="SELLER" id={alert.tender.sellerName} label={alert.tender.sellerName} size={14} />
+                </div>
+                <div className="text-sm font-semibold text-zinc-100">{alert.tender.sellerName}</div>
+              </div>
+            )}
+          </div>
 
           <div className="mt-6">
             <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">

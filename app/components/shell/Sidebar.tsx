@@ -9,14 +9,16 @@ import {
   Bell,
   Map as MapIcon,
   Network,
+  Star,
   Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
   Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWatchlist } from "@/lib/watchlist";
 
-type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number };
+type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Дашборд", icon: LayoutDashboard },
@@ -24,10 +26,12 @@ const NAV: NavItem[] = [
   { href: "/alerts", label: "Алерты", icon: Bell },
   { href: "/map", label: "Карта", icon: MapIcon },
   { href: "/connections", label: "Связи", icon: Network },
+  { href: "/watchlist", label: "Watchlist", icon: Star },
   { href: "/settings", label: "Настройки", icon: SettingsIcon },
 ];
 
 export function Sidebar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
+  const { items: watchlist } = useWatchlist();
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
@@ -51,9 +55,11 @@ export function Sidebar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
       </div>
 
       <nav className="px-3 space-y-1">
-        {NAV.map(({ href, label, icon: Icon, badge }) => {
+        {NAV.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          const showBadge = label === "Алерты" && unreadAlerts > 0;
+          const badge =
+            label === "Алерты" ? unreadAlerts : label === "Watchlist" ? watchlist.length : 0;
+          const badgeColor = label === "Watchlist" ? "bg-amber-500/90" : "bg-rose-500/90";
           return (
             <Link
               key={href}
@@ -67,13 +73,13 @@ export function Sidebar({ unreadAlerts = 0 }: { unreadAlerts?: number }) {
             >
               <Icon className="h-[18px] w-[18px] shrink-0" />
               {!collapsed && <span className="truncate">{label}</span>}
-              {!collapsed && showBadge && (
-                <span className="ml-auto inline-flex h-5 min-w-[22px] items-center justify-center rounded-full bg-rose-500/90 px-1.5 text-[10px] font-bold text-white">
-                  {unreadAlerts > 99 ? "99+" : unreadAlerts}
+              {!collapsed && badge > 0 && (
+                <span className={`ml-auto inline-flex h-5 min-w-[22px] items-center justify-center rounded-full ${badgeColor} px-1.5 text-[10px] font-bold text-white`}>
+                  {badge > 99 ? "99+" : badge}
                 </span>
               )}
-              {collapsed && showBadge && (
-                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500" />
+              {collapsed && badge > 0 && (
+                <span className={`absolute right-1 top-1 h-2 w-2 rounded-full ${badgeColor}`} />
               )}
             </Link>
           );

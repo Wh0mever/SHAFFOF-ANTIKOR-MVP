@@ -11,6 +11,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { ClientAlert } from "@/lib/hooks";
+import { TOOLTIP_STYLE } from "./chartTheme";
 
 export function TrendChart({ alerts }: { alerts: ClientAlert[] }) {
   const data = useMemo(() => {
@@ -61,8 +62,10 @@ export function TrendChart({ alerts }: { alerts: ClientAlert[] }) {
             <XAxis dataKey="date" tick={{ fill: "#71717a", fontSize: 10 }} stroke="#3f3f46" />
             <YAxis tick={{ fill: "#71717a", fontSize: 10 }} stroke="#3f3f46" allowDecimals={false} />
             <Tooltip
-              contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 8 }}
-              labelStyle={{ color: "#a1a1aa" }}
+              contentStyle={TOOLTIP_STYLE.contentStyle}
+              labelStyle={TOOLTIP_STYLE.labelStyle}
+              itemStyle={TOOLTIP_STYLE.itemStyle}
+              cursor={TOOLTIP_STYLE.cursor}
             />
             <Area type="monotone" dataKey="tenders" stroke="#10b981" strokeWidth={2} fill="url(#t)" />
             <Area type="monotone" dataKey="alerts" stroke="#f43f5e" strokeWidth={2} fill="url(#a)" />

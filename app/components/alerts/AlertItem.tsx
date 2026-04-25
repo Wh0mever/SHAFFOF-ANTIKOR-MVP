@@ -1,7 +1,8 @@
 "use client";
 
-import { AlertTriangle, Clock, Eye, CheckCheck } from "lucide-react";
+import { AlertTriangle, Clock, Eye } from "lucide-react";
 import type { ClientAlert } from "@/lib/hooks";
+import { StarButton } from "../shell/StarButton";
 
 const RULE_LABEL: Record<string, string> = {
   SOLO: "Единственный участник",
@@ -61,9 +62,7 @@ export function AlertItem({
           </div>
         </div>
 
-        <button className="text-zinc-600 opacity-0 transition group-hover:opacity-100 hover:text-emerald-400">
-          <CheckCheck className="h-4 w-4" />
-        </button>
+        <StarButton kind="TENDER" id={alert.tender.id} label={alert.tender.title} size={16} />
       </div>
     </div>
   );

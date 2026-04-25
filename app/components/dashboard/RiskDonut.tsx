@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import type { ClientAlert } from "@/lib/hooks";
+import { TOOLTIP_STYLE } from "./chartTheme";
 
 const TIERS = [
   { name: "Низкий", min: 0, max: 39, color: "#10b981" },
@@ -34,7 +35,9 @@ export function RiskDonut({ alerts }: { alerts: ClientAlert[] }) {
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 8 }}
+              contentStyle={TOOLTIP_STYLE.contentStyle}
+              labelStyle={TOOLTIP_STYLE.labelStyle}
+              itemStyle={TOOLTIP_STYLE.itemStyle}
             />
             <Legend
               iconType="circle"

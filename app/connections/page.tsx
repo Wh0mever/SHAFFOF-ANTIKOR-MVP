@@ -6,6 +6,7 @@ import { Shell } from "../components/shell/Shell";
 import { useLiveAlerts, type ClientAlert } from "@/lib/hooks";
 import { ConnectionDetailModal, type ConnectionData } from "../components/connections/ConnectionDetailModal";
 import { BuyerDetailModal } from "../components/connections/BuyerDetailModal";
+import { ConnectionGraph } from "../components/connections/ConnectionGraph";
 
 type Edge = {
   buyer: { name: string; tin: string };
@@ -81,6 +82,30 @@ export default function ConnectionsPage() {
 
   return (
     <Shell title="Связи" subtitle="Граф отношений заказчиков и поставщиков">
+      <div className="mb-5 rounded-2xl border border-zinc-800/80 bg-zinc-950 p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+            <NetworkIcon className="h-4 w-4 text-emerald-400" />
+            Граф связей · топ-8 × топ-8
+          </h3>
+          <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" /> заказчик
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-indigo-500" /> поставщик
+            </span>
+          </div>
+        </div>
+        <ConnectionGraph
+          alerts={alerts}
+          onPickPair={(buyer, seller) => {
+            const e = edges.find((x) => x.buyer.name === buyer && x.seller.name === seller);
+            if (e) setOpenConnection({ buyer: e.buyer, seller: e.seller, alerts: e.alerts });
+          }}
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950 p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
