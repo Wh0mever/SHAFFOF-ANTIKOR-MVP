@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +84,6 @@ const RULE_DEFS: Record<string, string> = {
 function localAnswer(userText: string, ctx: Ctx | null): string {
   const q = userText.toLowerCase();
 
-  // Definitions
   for (const [code, def] of Object.entries(RULE_DEFS)) {
     if (q.includes(code.toLowerCase()) || q.includes(RULE_NAMES[code])) {
       return def;
@@ -97,9 +96,7 @@ function localAnswer(userText: string, ctx: Ctx | null): string {
 
   if (q.includes("красн") || q.includes("риск") || q.includes("регион") || q.includes("зон")) {
     if (ctx.topRegions.length === 0) return "В базе пока нет алертов по регионам.";
-    const list = ctx.topRegions
-      .map((r) => `${r.region} — ${r.count}`)
-      .join(", ");
+    const list = ctx.topRegions.map((r) => `${r.region} — ${r.count}`).join(", ");
     return `Топ-5 регионов по числу алертов: ${list}.`;
   }
 
@@ -117,16 +114,15 @@ function localAnswer(userText: string, ctx: Ctx | null): string {
     return `Топ-5 заказчиков по числу алертов:\n${list}`;
   }
 
-  if (q.includes("сумм") || q.includes("риск") || q.includes("млрд") || q.includes("млн")) {
+  if (q.includes("сумм") || q.includes("млрд") || q.includes("млн")) {
     const ms = Number(ctx.amountAtRisk) / 1_000_000_000;
-    return `Общая сумма «под риском» по всем алертам: ${ms.toFixed(2)} млрд сум. Это сумма всех тендеров, по которым сработала хотя бы одна аномалия.`;
+    return `Общая сумма «под риском» по всем алертам: ${ms.toFixed(2)} млрд сум.`;
   }
 
   if (q.includes("здравств") || q.includes("привет") || q.includes("hello") || q.includes("салом")) {
     return `Здравствуйте! В системе сейчас ${ctx.total} алертов (${ctx.critical} критических). Спросите, например: "Какие регионы в красной зоне?" или "Что такое SOLO?"`;
   }
 
-  // Generic stats fallback
   return `В системе ${ctx.total} алертов: ${ctx.critical} критических, ${ctx.high} высоких. По типам: ${ctx.byRule.map((r) => `${r.ruleCode}=${r.count}`).join(", ")}. Уточните вопрос — могу рассказать про конкретный регион, заказчика или тип аномалии.`;
 }
 
@@ -156,31 +152,62 @@ function ctxToText(ctx: Ctx): string {
   ].join("\n");
 }
 
-async function callOpenAI(messages: Msg[], system: string): Promise<string | null> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key || key.includes("xxxx") || key.length < 20) return null;
+function hasRealKey(): boolean {
+  const k = process.env.OPENAI_API_KEY;
+  return Boolean(k && !k.includes("xxxx") && k.length >= 20);
+}
 
-  try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: process.env.AI_MODEL_FAST || "gpt-4o-mini",
-        messages: [{ role: "system", content: system }, ...messages.slice(-10)],
-        temperature: 0.4,
-        max_tokens: 400,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
+/** Stream a fixed text in small chunks, mimicking real LLM streaming. */
+async function* fakeStream(text: string, chunkSize = 4, delayMs = 18) {
+  for (let i = 0; i < text.length; i += chunkSize) {
+    yield text.slice(i, i + chunkSize);
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+}
 
-    if (!res.ok) return null;
-    const data = (await res.json()) as { choices: { message: { content: string } }[] };
-    return data.choices?.[0]?.message?.content?.trim() ?? null;
-  } catch {
-    return null;
+/** Stream OpenAI chat-completion deltas as plain-text chunks. */
+async function* openaiStream(messages: Msg[], system: string): AsyncGenerator<string> {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: process.env.AI_MODEL_FAST || "gpt-4o-mini",
+      messages: [{ role: "system", content: system }, ...messages.slice(-10)],
+      temperature: 0.4,
+      max_tokens: 500,
+      stream: true,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error(`openai ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === "[DONE]") return;
+      try {
+        const parsed = JSON.parse(payload);
+        const delta = parsed?.choices?.[0]?.delta?.content;
+        if (typeof delta === "string" && delta.length > 0) yield delta;
+      } catch {}
+    }
   }
 }
 
@@ -191,13 +218,39 @@ export async function POST(req: NextRequest) {
   const ctx = await loadContext();
   const ctxText = ctx ? ctxToText(ctx) : "База данных недоступна.";
   const system = `${SYSTEM}\n\n${ctxText}`;
+  const useOpenAI = hasRealKey();
 
-  const aiReply = await callOpenAI(messages, system);
-  if (aiReply) {
-    return NextResponse.json({ reply: aiReply, source: "openai" });
-  }
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        if (useOpenAI) {
+          for await (const chunk of openaiStream(messages, system)) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+        } else {
+          const text = localAnswer(lastUser, ctx);
+          for await (const chunk of fakeStream(text)) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+        }
+      } catch (err) {
+        // Fallback to local on any error mid-stream.
+        const text = localAnswer(lastUser, ctx);
+        for await (const chunk of fakeStream(text)) {
+          controller.enqueue(encoder.encode(chunk));
+        }
+      } finally {
+        controller.close();
+      }
+    },
+  });
 
-  // Fallback: deterministic local answer based on stats
-  const reply = localAnswer(lastUser, ctx);
-  return NextResponse.json({ reply, source: "local" });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }

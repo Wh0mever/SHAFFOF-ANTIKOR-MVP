@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
 import { Shell } from "../components/shell/Shell";
 import { UzMap2D, type RegionRiskMap } from "../components/map/UzMap2D";
-import { useLiveAlerts } from "@/lib/hooks";
+import { useLiveAlerts, type ClientAlert } from "@/lib/hooks";
 import { UZ_REGIONS } from "@/lib/regions";
-import { formatUzs } from "@/lib/utils";
+import { AlertDetailModal } from "../components/alerts/AlertDetailModal";
+import { RULE_LABEL } from "@/lib/anomalies";
+import { StarButton } from "../components/shell/StarButton";
 
 const TIERS = [
   { label: "Критический (>60)", color: "#dc2626" },
@@ -19,6 +21,7 @@ const TIERS = [
 export default function MapPage() {
   const { alerts } = useLiveAlerts(15_000);
   const [selected, setSelected] = useState<string | null>("Toshkent shahri");
+  const [openAlert, setOpenAlert] = useState<ClientAlert | null>(null);
 
   const riskByRegion = useMemo<RegionRiskMap>(() => {
     const m: RegionRiskMap = new Map();
@@ -119,19 +122,58 @@ export default function MapPage() {
               </div>
 
               <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950 p-5">
-                <div className="mb-3 text-[10px] uppercase tracking-wider text-zinc-500">Тендеры региона</div>
-                <div className="max-h-[230px] space-y-2 overflow-y-auto">
-                  {selAlerts.slice(0, 30).map((a) => (
-                    <div key={a.id} className="rounded-lg bg-zinc-900/40 px-3 py-2">
-                      <div className="flex items-baseline justify-between gap-2 text-[11px]">
-                        <span className="font-mono text-zinc-500">{a.tender.displayNo}</span>
-                        <span className="font-mono text-zinc-400">
-                          {Math.round(Number(a.tender.amount) / 1_000_000)} млн
-                        </span>
-                      </div>
-                      <div className="truncate text-sm text-zinc-200">{a.tender.title}</div>
-                    </div>
-                  ))}
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+                    Тендеры региона ({new Set(selAlerts.map((a) => a.tender.id)).size})
+                  </div>
+                  <StarButton
+                    kind="REGION"
+                    id={selected}
+                    label={UZ_REGIONS[selected]?.nameUz ?? selected}
+                    size={16}
+                  />
+                </div>
+                <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
+                  {dedupTenders(selAlerts).slice(0, 30).map((a) => {
+                    const tier =
+                      a.severity >= 80
+                        ? "#f43f5e"
+                        : a.severity >= 60
+                        ? "#f97316"
+                        : a.severity >= 40
+                        ? "#facc15"
+                        : "#10b981";
+                    return (
+                      <button
+                        key={a.tender.id}
+                        onClick={() => setOpenAlert(a)}
+                        className="group w-full rounded-lg border border-zinc-800/60 bg-zinc-900/40 px-3 py-2.5 text-left transition hover:border-emerald-500/40 hover:bg-zinc-900/80"
+                      >
+                        <div className="flex items-baseline justify-between gap-2 text-[11px]">
+                          <span className="font-mono text-zinc-500">{a.tender.displayNo}</span>
+                          <span className="font-mono text-zinc-300">
+                            {Math.round(Number(a.tender.amount) / 1_000_000).toLocaleString("ru-RU")} млн
+                          </span>
+                        </div>
+                        <div className="mt-0.5 truncate text-sm text-zinc-100">{a.tender.title}</div>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span
+                            className="rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold ring-1"
+                            style={{
+                              color: tier,
+                              background: tier + "1A",
+                              borderColor: tier + "55",
+                            }}
+                          >
+                            {a.severity}
+                          </span>
+                          <span className="rounded-md bg-zinc-800/60 px-1.5 py-0.5 text-[9px] text-zinc-400">
+                            {RULE_LABEL[a.ruleCode] ?? a.ruleCode}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                   {selAlerts.length === 0 && (
                     <div className="rounded-lg border border-dashed border-zinc-800 px-3 py-6 text-center text-xs text-zinc-600">
                       В этом регионе нет алертов
@@ -169,8 +211,20 @@ export default function MapPage() {
           </div>
         </div>
       </div>
+
+      <AlertDetailModal alert={openAlert} allAlerts={alerts} onClose={() => setOpenAlert(null)} />
     </Shell>
   );
+}
+
+/** Group alerts by tender.id, keep the one with the highest severity per tender. */
+function dedupTenders(alerts: ClientAlert[]): ClientAlert[] {
+  const m = new Map<string, ClientAlert>();
+  for (const a of alerts) {
+    const cur = m.get(a.tender.id);
+    if (!cur || a.severity > cur.severity) m.set(a.tender.id, a);
+  }
+  return Array.from(m.values()).sort((a, b) => b.severity - a.severity);
 }
 
 function MiniStat({

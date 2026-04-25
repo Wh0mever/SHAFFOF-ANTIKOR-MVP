@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, X, User2, Bot, Sparkles, FileText, Download } from "lucide-react";
 import type { ClientAlert } from "@/lib/hooks";
-import { Typewriter } from "../ui/Typewriter";
 import { RULE_LABEL, RULE_DEFAULT_DESC, severityTint, tenScale } from "@/lib/anomalies";
 import { StarButton } from "../shell/StarButton";
 
@@ -38,23 +37,79 @@ export function AlertDetailModal({
   const [report, setReport] = useState<string | null>(null);
   const [loading, setLoading] = useState<AITab | null>(null);
 
+  // Track whether explain is currently streaming so we can show the cursor.
+  const [streaming, setStreaming] = useState(false);
+
   useEffect(() => {
     if (!alert) return;
     setExplanation(alert.aiExplanation);
     setResearch(alert.aiResearch);
     setReport(alert.aiReport);
     setTab("fast");
-    if (!alert.aiExplanation && !alert.id.startsWith("demo-")) {
-      setLoading("fast");
-      fetch(`/api/alerts/${alert.id}/explain`, { method: "POST" })
-        .then((r) => r.json())
-        .then((d) => setExplanation(d.explanation ?? null))
-        .finally(() => setLoading(null));
-    } else if (alert.id.startsWith("demo-") && !alert.aiExplanation) {
-      setExplanation(
-        "AI-аналитик: данный тендер содержит признаки ограниченной конкуренции. Сумма выше типичных значений по категории. Рекомендуется проверить связь между заказчиком и поставщиком, а также историю предыдущих контрактов."
-      );
+    setStreaming(false);
+
+    if (alert.aiExplanation) return;
+
+    if (alert.id.startsWith("demo-")) {
+      // For demo alerts, simulate streaming locally.
+      const text =
+        "AI-аналитик: данный тендер содержит признаки ограниченной конкуренции. Сумма выше типичных значений по категории. Рекомендуется проверить связь между заказчиком и поставщиком, а также историю предыдущих контрактов.";
+      let i = 0;
+      setExplanation("");
+      setStreaming(true);
+      const id = setInterval(() => {
+        i += 5;
+        if (i >= text.length) {
+          setExplanation(text);
+          setStreaming(false);
+          clearInterval(id);
+        } else {
+          setExplanation(text.slice(0, i));
+        }
+      }, 20);
+      return () => {
+        clearInterval(id);
+        setStreaming(false);
+      };
     }
+
+    // Real alert — stream from server.
+    let cancelled = false;
+    const ac = new AbortController();
+    setExplanation("");
+    setStreaming(true);
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/alerts/${alert.id}/explain/stream`, {
+          method: "GET",
+          signal: ac.signal,
+        });
+        if (!res.body) {
+          setStreaming(false);
+          return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let acc = "";
+        while (!cancelled) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          acc += decoder.decode(value, { stream: true });
+          if (!cancelled) setExplanation(acc);
+        }
+      } catch {
+        // ignore — could be aborted on alert change
+      } finally {
+        if (!cancelled) setStreaming(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      ac.abort();
+      setStreaming(false);
+    };
   }, [alert]);
 
   if (!alert) return null;
@@ -275,21 +330,37 @@ export function AlertDetailModal({
             </div>
 
             <div className="min-h-[120px] whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">
-              {isLoading ? (
+              {tab === "fast" ? (
+                <>
+                  {explanation ? (
+                    <>
+                      {explanation}
+                      {streaming && (
+                        <span className="ml-0.5 inline-block h-[1em] w-[2px] -translate-y-[2px] animate-pulse bg-emerald-400 align-middle" />
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 text-zinc-500">
+                      <span className="inline-flex gap-1">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:200ms]" />
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:400ms]" />
+                      </span>
+                      GPT-4o-mini анализирует…
+                    </div>
+                  )}
+                </>
+              ) : isLoading ? (
                 <div className="flex items-center gap-2 text-zinc-500">
                   <span className="inline-flex gap-1">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:200ms]" />
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:400ms]" />
                   </span>
-                  AI анализирует данные через {tab === "fast" ? "GPT-4o-mini" : tab === "research" ? "Perplexity sonar-pro" : "Claude Sonnet 4.5"}…
+                  AI анализирует данные через {tab === "research" ? "Perplexity sonar-pro" : "Claude Sonnet 4.5"}…
                 </div>
               ) : aiText ? (
-                tab === "fast" ? (
-                  <Typewriter text={aiText} speed={10} />
-                ) : (
-                  aiText
-                )
+                aiText
               ) : (
                 <div className="text-zinc-600">
                   Нажмите вкладку выше, чтобы запустить анализ.

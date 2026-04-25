@@ -97,19 +97,40 @@ export function ChatWidget() {
     const content = (text ?? input).trim();
     if (!content || loading) return;
     setInput("");
-    const next: Msg[] = [...messages, { role: "user", content }];
-    setMessages(next);
+    const baseMsgs: Msg[] = [...messages, { role: "user", content }];
+    setMessages(baseMsgs);
     setLoading(true);
+
+    // Add empty assistant placeholder we'll fill as the stream arrives.
+    const withPlaceholder: Msg[] = [...baseMsgs, { role: "assistant", content: "" }];
+    setMessages(withPlaceholder);
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: baseMsgs }),
       });
-      const data = await res.json();
-      setMessages([...next, { role: "assistant", content: data.reply ?? "Ошибка ответа." }]);
+      if (!res.body) {
+        setMessages([...baseMsgs, { role: "assistant", content: "Сервис недоступен." }]);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        // Update last (assistant) message in place.
+        setMessages([...baseMsgs, { role: "assistant", content: acc }]);
+      }
+      if (acc.trim().length === 0) {
+        setMessages([...baseMsgs, { role: "assistant", content: "Пустой ответ от сервера." }]);
+      }
     } catch {
-      setMessages([...next, { role: "assistant", content: "Сервис недоступен. Попробуйте позже." }]);
+      setMessages([...baseMsgs, { role: "assistant", content: "Сервис недоступен. Попробуйте позже." }]);
     } finally {
       setLoading(false);
     }
@@ -152,28 +173,37 @@ export function ChatWidget() {
           </header>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap",
-                  m.role === "user"
-                    ? "ml-auto bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-500/30"
-                    : "bg-zinc-900 text-zinc-200 ring-1 ring-zinc-800"
-                )}
-              >
-                {m.content}
-              </div>
-            ))}
-            {loading && (
-              <div className="max-w-[85%] rounded-2xl bg-zinc-900 px-3.5 py-2 text-sm text-zinc-400 ring-1 ring-zinc-800">
-                <span className="inline-flex gap-1">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:200ms]" />
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:400ms]" />
-                </span>
-              </div>
-            )}
+            {messages.map((m, i) => {
+              const isLastAssistant =
+                loading && i === messages.length - 1 && m.role === "assistant";
+              const isEmptyStreaming = isLastAssistant && m.content.length === 0;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap",
+                    m.role === "user"
+                      ? "ml-auto bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-500/30"
+                      : "bg-zinc-900 text-zinc-200 ring-1 ring-zinc-800"
+                  )}
+                >
+                  {isEmptyStreaming ? (
+                    <span className="inline-flex gap-1">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:200ms]" />
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 [animation-delay:400ms]" />
+                    </span>
+                  ) : (
+                    <>
+                      {m.content}
+                      {isLastAssistant && (
+                        <span className="ml-0.5 inline-block h-[1em] w-[2px] -translate-y-[2px] animate-pulse bg-emerald-400 align-middle" />
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {showSuggestions && (
