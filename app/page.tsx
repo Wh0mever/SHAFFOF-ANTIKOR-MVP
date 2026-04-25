@@ -1,138 +1,116 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useLiveAlerts, useStats } from "@/lib/hooks";
-import { KpiOverlay } from "./components/KpiOverlay";
-import { LiveTicker } from "./components/LiveTicker";
-import { DemoButton } from "./components/DemoButton";
-import { SeverityBadge, RuleBadge } from "./components/ui/badge";
-import { formatUzs, timeAgoUz } from "@/lib/utils";
+import { ShieldCheck, AlertOctagon, Bell, Bot } from "lucide-react";
+import { Shell } from "./components/shell/Shell";
+import { KpiCard } from "./components/dashboard/KpiCard";
+import { TrendChart } from "./components/dashboard/TrendChart";
+import { RiskDonut } from "./components/dashboard/RiskDonut";
+import { RegionBars } from "./components/dashboard/RegionBars";
+import { TopRiskTenders } from "./components/dashboard/TopRiskTenders";
+import { RecentAlertsTable } from "./components/dashboard/RecentAlertsTable";
+import { useLiveAlerts } from "@/lib/hooks";
 
-const Globe = dynamic(() => import("./components/globe/Globe").then((m) => m.Globe), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center text-xs text-zinc-500">
-      Globus yuklanmoqda…
-    </div>
-  ),
-});
+export default function DashboardPage() {
+  const { alerts } = useLiveAlerts(15_000);
 
-export default function HomePage() {
-  const { alerts, lastSync, refresh } = useLiveAlerts(10_000);
-  const { stats } = useStats(30_000);
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-
-  const globeAlerts = useMemo(
-    () =>
-      alerts.map((a) => ({
-        id: a.id,
-        region: a.region,
-        severity: a.severity,
-        ruleCode: a.ruleCode,
-      })),
-    [alerts]
-  );
-
-  const tickerItems = useMemo(
-    () =>
-      alerts.slice(0, 40).map((a) => ({
-        id: a.id,
-        region: a.region,
-        ruleCode: a.ruleCode,
-        severity: a.severity,
-        amount: a.tender.amount,
-        title: a.tender.title,
-      })),
-    [alerts]
-  );
-
-  const panelAlerts = selectedRegion
-    ? alerts.filter((a) => a.region === selectedRegion).slice(0, 20)
-    : [];
+  const totalTenders = new Set(alerts.map((a) => a.tender.id)).size;
+  const suspicious = alerts.filter((a) => a.severity >= 60).length;
+  const critical = alerts.filter((a) => a.severity >= 80).length;
+  const aiAnalyzed = alerts.filter((a) => a.aiExplanation).length;
+  const avgRisk =
+    alerts.length === 0 ? 0 : Math.round(alerts.reduce((s, a) => s + a.severity, 0) / alerts.length);
+  const regions = new Set(alerts.map((a) => a.region)).size;
+  const categories = new Set(alerts.map((a) => a.tender.category).filter(Boolean)).size;
+  const buyers = new Set(alerts.map((a) => a.tender.buyerTin)).size;
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-black">
-      <div className="pointer-events-none fixed left-6 top-6 z-20">
-        <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-500">Live watchdog</div>
-        <div className="text-3xl font-bold text-emerald-400">SHAFFOF</div>
-        <div className="mt-1 text-xs text-zinc-500">Davlat xaridlari · xarid.uzex.uz</div>
-        <div className="pointer-events-auto mt-4 flex gap-2 text-xs">
-          <Link href="/feed" className="rounded-md border border-zinc-800 bg-black/60 px-3 py-1 text-zinc-300 hover:text-emerald-400">
-            Feed
-          </Link>
-          <a
-            href="/api/v1/alerts"
-            className="rounded-md border border-zinc-800 bg-black/60 px-3 py-1 text-zinc-300 hover:text-emerald-400"
-          >
-            API
-          </a>
+    <Shell title="Дашборд" subtitle="Реальное время мониторинга госзакупок Узбекистана">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label="Всего тендеров"
+          value={totalTenders}
+          sub="В системе"
+          icon={ShieldCheck}
+          tint="emerald"
+          trend={{ value: 12, positive: true }}
+        />
+        <KpiCard
+          label="Подозрительных"
+          value={suspicious}
+          sub={`${totalTenders > 0 ? Math.round((suspicious / totalTenders) * 100) : 0}% от общего числа`}
+          icon={AlertOctagon}
+          tint="amber"
+        />
+        <KpiCard
+          label="Критических алертов"
+          value={critical}
+          sub="Требуют проверки"
+          icon={Bell}
+          tint="rose"
+        />
+        <KpiCard
+          label="Проанализировано AI"
+          value={aiAnalyzed}
+          sub="Тендеров с AI-оценкой"
+          icon={Bot}
+          tint="indigo"
+        />
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div className="xl:col-span-2">
+          <TrendChart alerts={alerts} />
+        </div>
+        <RiskDonut alerts={alerts} />
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <RegionBars alerts={alerts} />
+        <TopRiskTenders alerts={alerts} />
+      </div>
+
+      <div className="mt-5">
+        <RecentAlertsTable alerts={alerts} />
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 items-center gap-4 rounded-2xl border border-zinc-800/80 bg-zinc-950 p-5 sm:grid-cols-[auto_1fr_auto]">
+        <div className="relative flex h-14 w-14 items-center justify-center">
+          <svg viewBox="0 0 36 36" className="h-14 w-14 -rotate-90">
+            <circle cx="18" cy="18" r="14" stroke="#27272a" strokeWidth="3" fill="none" />
+            <circle
+              cx="18"
+              cy="18"
+              r="14"
+              stroke="#10b981"
+              strokeWidth="3"
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray={`${(avgRisk / 100) * 87.96} 87.96`}
+            />
+          </svg>
+          <span className="absolute text-sm font-bold text-zinc-100">{avgRisk}</span>
+        </div>
+        <div>
+          <div className="text-sm font-semibold text-zinc-200">Средний риск по системе</div>
+          <div className="text-xs text-zinc-500">
+            {avgRisk < 50 ? "Уровень риска в пределах нормы" : "Уровень риска повышен"}
+          </div>
+        </div>
+        <div className="flex gap-6 text-right text-sm">
+          <Stat label="Регионов" value={regions} />
+          <Stat label="Категорий" value={categories} />
+          <Stat label="Компаний" value={buyers} />
         </div>
       </div>
+    </Shell>
+  );
+}
 
-      <KpiOverlay
-        data={{
-          alerts24h: stats?.alerts24h ?? 0,
-          totalAlerts: stats?.totalAlerts ?? alerts.length,
-          amountAtRisk: stats?.amountAtRisk ?? "0",
-          lastSync,
-        }}
-      />
-
-      <div className="absolute inset-0">
-        <Globe alerts={globeAlerts} onRegionClick={setSelectedRegion} />
-      </div>
-
-      {selectedRegion && (
-        <aside className="pointer-events-auto fixed right-6 top-48 z-20 w-[340px] max-h-[calc(100vh-260px)] overflow-y-auto rounded-lg border border-zinc-800 bg-black/80 p-4 backdrop-blur">
-          <div className="mb-3 flex items-start justify-between">
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-zinc-500">Viloyat</div>
-              <h2 className="text-sm font-semibold text-zinc-100">{selectedRegion}</h2>
-              <div className="text-[10px] text-zinc-500">
-                {panelAlerts.length} ta ogohlantirish
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedRegion(null)}
-              className="text-xs text-zinc-500 hover:text-zinc-200"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {panelAlerts.length === 0 && (
-              <p className="text-xs text-zinc-500">Bu viloyatda hozircha ogohlantirish yo'q.</p>
-            )}
-            {panelAlerts.map((a) => (
-              <div
-                key={a.id}
-                className="rounded-md border border-zinc-800/80 bg-zinc-950/80 p-2 text-xs"
-              >
-                <div className="mb-1 flex items-center gap-1.5">
-                  <RuleBadge code={a.ruleCode} />
-                  <SeverityBadge severity={a.severity} />
-                  <span className="ml-auto text-[10px] text-zinc-500">
-                    {timeAgoUz(new Date(a.createdAt))}
-                  </span>
-                </div>
-                <div className="truncate text-zinc-200">{a.tender.title}</div>
-                <div className="mt-0.5 flex items-center justify-between text-zinc-500">
-                  <span className="truncate">{a.tender.buyerName}</span>
-                  <span className="text-emerald-400">
-                    {formatUzs(BigInt(a.tender.amount))}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </aside>
-      )}
-
-      <LiveTicker items={tickerItems} />
-      <DemoButton onCreated={refresh} />
-    </main>
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="text-xl font-bold text-zinc-100">{value}</div>
+      <div className="text-[10px] uppercase tracking-wide text-zinc-500">{label}</div>
+    </div>
   );
 }

@@ -1,6 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { DEMO_ALERTS, DEMO_STATS } from "./demo";
+
+function getMode(): "LIVE" | "DEMO" {
+  if (typeof window === "undefined") return "LIVE";
+  return (localStorage.getItem("shaffof.mode") as "LIVE" | "DEMO") || "LIVE";
+}
+
+function useModeListener() {
+  const [m, setM] = useState<"LIVE" | "DEMO">("LIVE");
+  useEffect(() => {
+    setM(getMode());
+    const h = (e: Event) => setM((e as CustomEvent).detail as "LIVE" | "DEMO");
+    window.addEventListener("shaffof:mode", h);
+    return () => window.removeEventListener("shaffof:mode", h);
+  }, []);
+  return m;
+}
 
 export type ClientAlert = {
   id: string;
@@ -30,16 +47,20 @@ export type ClientAlert = {
 };
 
 export function useLiveAlerts(intervalMs = 10_000) {
+  const mode = useModeListener();
   const [alerts, setAlerts] = useState<ClientAlert[]>([]);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-  const seen = useRef(new Set<string>());
 
   async function pull() {
+    if (mode === "DEMO") {
+      setAlerts(DEMO_ALERTS);
+      setLastSync(new Date());
+      return;
+    }
     try {
       const res = await fetch("/api/alerts?limit=200", { cache: "no-store" });
       if (!res.ok) return;
       const data = (await res.json()) as { alerts: ClientAlert[] };
-      seen.current = new Set(data.alerts.map((a) => a.id));
       setAlerts(data.alerts);
       setLastSync(new Date());
     } catch (err) {
@@ -49,11 +70,12 @@ export function useLiveAlerts(intervalMs = 10_000) {
 
   useEffect(() => {
     pull();
+    if (mode === "DEMO") return;
     const t = setInterval(pull, intervalMs);
     return () => clearInterval(t);
-  }, [intervalMs]);
+  }, [intervalMs, mode]);
 
-  return { alerts, lastSync, refresh: pull };
+  return { alerts, lastSync, mode, refresh: pull };
 }
 
 export type StatsPayload = {
@@ -66,9 +88,14 @@ export type StatsPayload = {
 };
 
 export function useStats(intervalMs = 30_000) {
+  const mode = useModeListener();
   const [stats, setStats] = useState<StatsPayload | null>(null);
 
   async function pull() {
+    if (mode === "DEMO") {
+      setStats(DEMO_STATS);
+      return;
+    }
     try {
       const res = await fetch("/api/v1/stats", { cache: "no-store" });
       if (!res.ok) return;
@@ -81,9 +108,10 @@ export function useStats(intervalMs = 30_000) {
 
   useEffect(() => {
     pull();
+    if (mode === "DEMO") return;
     const t = setInterval(pull, intervalMs);
     return () => clearInterval(t);
-  }, [intervalMs]);
+  }, [intervalMs, mode]);
 
-  return { stats, refresh: pull };
+  return { stats, mode, refresh: pull };
 }
