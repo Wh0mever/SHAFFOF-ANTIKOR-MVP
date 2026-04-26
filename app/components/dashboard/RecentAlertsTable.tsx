@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { ClientAlert } from "@/lib/hooks";
+import { AlertDetailModal } from "../alerts/AlertDetailModal";
 
 export function RecentAlertsTable({ alerts }: { alerts: ClientAlert[] }) {
   const rows = alerts.slice(0, 6);
+  const [open, setOpen] = useState<ClientAlert | null>(null);
+
   return (
     <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950 p-5">
       <div className="mb-4 flex items-center justify-between">
@@ -30,7 +34,11 @@ export function RecentAlertsTable({ alerts }: { alerts: ClientAlert[] }) {
           </thead>
           <tbody className="divide-y divide-zinc-800/50">
             {rows.map((a) => (
-              <tr key={a.id} className="hover:bg-zinc-900/40">
+              <tr
+                key={a.id}
+                onClick={() => setOpen(a)}
+                className="cursor-pointer transition hover:bg-zinc-900/60"
+              >
                 <td className="py-3 font-mono text-[11px] text-zinc-400">{a.tender.displayNo}</td>
                 <td className="py-3">
                   <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-[10px] font-mono uppercase text-zinc-300">
@@ -56,6 +64,8 @@ export function RecentAlertsTable({ alerts }: { alerts: ClientAlert[] }) {
           </tbody>
         </table>
       </div>
+
+      <AlertDetailModal alert={open} allAlerts={alerts} onClose={() => setOpen(null)} />
     </div>
   );
 }
